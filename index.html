@@ -200,7 +200,12 @@
     color: #fff; font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase;
     margin: 0.7rem 0 0.2rem;
   }
-
+  .vol-box {
+    background: var(--warm); border: 1px solid var(--border); border-radius: 10px;
+    padding: 0.95rem 1.15rem; margin-top: 1rem;
+    font-size: 0.73rem; line-height: 1.8; text-align: left;
+  }
+  .vol-box .vi { font-size: 1.15rem; display: block; margin-bottom: 0.25rem; }
 
   /* ── RESULTS ── */
   #results { gap: 1.4rem; overflow-y: auto; padding: 2rem; }
@@ -252,9 +257,9 @@
 
 <!-- ══ WELCOME ══ -->
 <div class="screen active" id="welcome">
-  <div class="lab-badge">Avila College · Data Analytics Research</div>
+  <div class="lab-badge">Avila College · Psychology Research</div>
   <h1 class="title">How does music affect<br><em>short-term memory?</em></h1>
-  <p class="subtitle">A controlled experiment on linguistic recall in female students aged 16–18. Three conditions: silence, instrumental music, and music with lyrics.</p>
+  <p class="subtitle">A controlled experiment on linguistic recall in female students aged 17–18. Three conditions: silence, instrumental music, and music with lyrics.</p>
   <button class="btn btn-primary" onclick="showScreen('setup')">Set Up Experiment →</button>
 </div>
 
@@ -267,10 +272,9 @@
     <input type="text" id="pName" placeholder="e.g. Participant 1" autocomplete="off">
 
     <div class="info-box">
-      <strong>ℹ️ Word lists rotate every participant</strong> — each of the 6 possible list orderings is used in sequence, guaranteeing variety across participants.<br>
+      <strong>ℹ️ Word lists are automatically randomised</strong> for each participant to control for order effects.<br>
       Condition order is always: <strong>Silence → Instrumental → Lyrics</strong>.<br>
-      All data is saved and exported together at the end.<br><br>
-      <strong>This participant will get:</strong> <span id="orderPreview" style="color:var(--ink);font-weight:500"></span>
+      All participant data is saved and exported together at the end.
     </div>
 
     <div class="btn-row" style="margin-top:1.5rem">
@@ -399,6 +403,7 @@ let timerSecs  = 60;
 let pName      = "";
 let allRows    = [];   // every row from every participant
 let pCount     = 0;    // how many participants done
+
 // ══════════════════════════════════════════
 // GOOGLE SHEETS INTEGRATION
 // ══════════════════════════════════════════
@@ -414,23 +419,6 @@ function sendToGoogleSheets(rows) {
   .then(() => console.log("✅ Data sent to Google Sheets"))
   .catch(err => console.error("❌ Google Sheets error:", err));
 }
-  
-// All 6 possible orderings of lists [0,1,2] — cycles through in order
-const ALL_ORDERS = [
-  [0,1,2], [0,2,1],
-  [1,0,2], [1,2,0],
-  [2,0,1], [2,1,0]
-];
-// Start at a random point in the cycle so different laptops don't all begin at the same order.
-// Also persist to localStorage so the index survives page refreshes on the same device.
-let orderIndex = (() => {
-  try {
-    const saved = localStorage.getItem('memexp_orderIndex');
-    if (saved !== null) return parseInt(saved, 10);
-  } catch(e) {}
-  // First ever load on this device — pick a random starting point
-  return Math.floor(Math.random() * 6);
-})();
 
 // ══════════════════════════════════════════
 // NAVIGATION
@@ -438,15 +426,6 @@ let orderIndex = (() => {
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if (id === 'setup') updateOrderPreview();
-}
-
-function updateOrderPreview() {
-  const order = ALL_ORDERS[orderIndex % ALL_ORDERS.length];
-  const names = ['List A', 'List B', 'List C'];
-  const conds = ['Silence', 'Instrumental', 'Lyrics'];
-  const el = document.getElementById('orderPreview');
-  if (el) el.textContent = order.map((l, i) => conds[i] + ' → ' + names[l]).join(' · ');
 }
 
 // ══════════════════════════════════════════
@@ -473,11 +452,17 @@ function startExperiment() {
   pName      = document.getElementById('pName').value.trim() || `Participant ${pCount + 1}`;
   condIdx    = 0;
   recallData = {};
-  // Cycle through all 6 orderings — guaranteed different each participant
-  listAssign = ALL_ORDERS[orderIndex % ALL_ORDERS.length];
-  orderIndex++;
-  try { localStorage.setItem('memexp_orderIndex', orderIndex); } catch(e) {}
+  listAssign = shuffle([0, 1, 2]);
   loadMemorise();
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
 // ══════════════════════════════════════════
@@ -613,8 +598,23 @@ function showBreak() {
   const nextCond = CONDS[condIdx];
   const m = META[nextCond];
 
+  let volHtml;
+  if (nextCond === 'silence') {
+    volHtml = `<div class="vol-box">
+      <span class="vi">🔇</span>
+      <strong>Next round is silent.</strong> No music will be playing — make sure any music from the previous round has stopped.
+    </div>`;
+  } else {
+    volHtml = `<div class="vol-box">
+      <span class="vi">🔊</span>
+      <strong>Turn your volume up now</strong> before continuing.<br>
+      The next round uses <strong>${m.label.toLowerCase()}</strong>. Please make sure the music is playing on your speaker before pressing Continue.
+    </div>`;
+  }
+
   document.getElementById('bNext').innerHTML = `
     <div style="margin-top:0.8rem;margin-bottom:0.2rem">Next up: <span class="next-pill" style="background:${m.color}">${m.emoji} ${m.label}</span></div>
+    ${volHtml}
   `;
   showScreen('break-screen');
 }
@@ -685,9 +685,11 @@ function showResultsScreen() {
       tbody.appendChild(tr);
     });
   });
-// ── Send this participant's data to Google Sheets ──
+
+  // ── Send this participant's data to Google Sheets ──
   const participantRows = allRows.filter(r => r["Participant #"] === pCount);
   sendToGoogleSheets(participantRows);
+
   showScreen('results');
 }
 
