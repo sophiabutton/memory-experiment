@@ -399,7 +399,22 @@ let timerSecs  = 60;
 let pName      = "";
 let allRows    = [];   // every row from every participant
 let pCount     = 0;    // how many participants done
+// ══════════════════════════════════════════
+// GOOGLE SHEETS INTEGRATION
+// ══════════════════════════════════════════
+const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbxVhl7jxnmxB5rGKEq8lJHM5xwb8Z67R3YIo3-QE3WozTVi9Px-iMWeFZkiSo9StoQ/exec";
 
+function sendToGoogleSheets(rows) {
+  fetch(GOOGLE_SHEET_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rows: rows })
+  })
+  .then(() => console.log("✅ Data sent to Google Sheets"))
+  .catch(err => console.error("❌ Google Sheets error:", err));
+}
+  
 // All 6 possible orderings of lists [0,1,2] — cycles through in order
 const ALL_ORDERS = [
   [0,1,2], [0,2,1],
@@ -670,7 +685,9 @@ function showResultsScreen() {
       tbody.appendChild(tr);
     });
   });
-
+// ── Send this participant's data to Google Sheets ──
+  const participantRows = allRows.filter(r => r["Participant #"] === pCount);
+  sendToGoogleSheets(participantRows);
   showScreen('results');
 }
 
