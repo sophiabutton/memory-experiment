@@ -409,7 +409,7 @@ const META = {
   lyrics:       { label:"Music with Lyrics",  pill:"pill-lyrics",       color:"#c8420a", emoji:"🎤" }
 };
 
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1z9xxLI9Myfh80uCZ3UwiHnwGaQg7b6b0iq6AAkIapFF6nON04Ok6XwcLSc5mNUBJGQ/exec";
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxhBXHq9MulrM4c9x6K1PU7jzXXfZm1Z66CEULbSrZlPRBUfw7l3g6YsEJxb-_v_X3IYg/exec";
 
 // ══════════════════════════════════════════
 // STATE — allRows persists across participants
@@ -643,27 +643,31 @@ function showResultsScreen() {
   pCount++;
   confetti();
 
-  // ── Save rows for this participant ──
+  // Build rows FIRST
   CONDS.forEach(cond => {
-    // Save newest participant data to Google Sheets
-saveToGoogleSheets(allRows.slice(-30));
     const d = recallData[cond];
     if (!d) return;
+
     const m = META[cond];
+
     d.words.forEach((word, i) => {
       const recalled = d.entered.some(e => e === word.toLowerCase());
+
       allRows.push({
-        "Participant":      pName,
-        "Participant #":    pCount,
-        "Condition":        m.label,
-        "List Number":      `List ${d.listIdx + 1}`,
-        "Target Word":      word,
-        "Recalled (Y/N)":   recalled ? "Y" : "N",
-        "Word Entered":     d.entered[i] || "",
-        "Score /10":        d.score
+        "Participant": pName,
+        "Participant #": pCount,
+        "Condition": m.label,
+        "List Number": `List ${d.listIdx + 1}`,
+        "Target Word": word,
+        "Recalled (Y/N)": recalled ? "Y" : "N",
+        "Word Entered": d.entered[i] || "",
+        "Score /10": d.score
       });
     });
   });
+
+  // ✅ SAVE ONCE (after everything is ready)
+  saveToGoogleSheets(allRows.slice(-30));
 
   // ── Score cards ──
   document.getElementById('rParticipant').textContent = pName;
@@ -754,13 +758,9 @@ function buildCSV() {
 async function saveToGoogleSheets(rows) {
   try {
     const response = await fetch(GOOGLE_SCRIPT_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(rows)
-    });
-
+  method: "POST",
+  body: JSON.stringify(rows)
+});
     const result = await response.json();
 
     console.log("Saved to Google Sheets:", result);
