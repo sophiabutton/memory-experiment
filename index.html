@@ -409,6 +409,8 @@ const META = {
   lyrics:       { label:"Music with Lyrics",  pill:"pill-lyrics",       color:"#c8420a", emoji:"🎤" }
 };
 
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1z9xxLI9Myfh80uCZ3UwiHnwGaQg7b6b0iq6AAkIapFF6nON04Ok6XwcLSc5mNUBJGQ/exec";
+
 // ══════════════════════════════════════════
 // STATE — allRows persists across participants
 // ══════════════════════════════════════════
@@ -643,6 +645,8 @@ function showResultsScreen() {
 
   // ── Save rows for this participant ──
   CONDS.forEach(cond => {
+    // Save newest participant data to Google Sheets
+saveToGoogleSheets(allRows.slice(-30));
     const d = recallData[cond];
     if (!d) return;
     const m = META[cond];
@@ -743,7 +747,30 @@ function buildCSV() {
   );
   return [headers, ...rows].join("\n");
 }
+  
+// ══════════════════════════════════════════
+// GOOGLE SHEETS SAVE
+// ══════════════════════════════════════════
+async function saveToGoogleSheets(rows) {
+  try {
+    const response = await fetch(GOOGLE_SCRIPT_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(rows)
+    });
 
+    const result = await response.json();
+
+    console.log("Saved to Google Sheets:", result);
+
+  } catch (error) {
+
+    console.error("Error saving to Google Sheets:", error);
+
+  }
+}
 function openModal() {
   document.getElementById('csvView').textContent = buildCSV();
   document.getElementById('dataModal').classList.add('open');
